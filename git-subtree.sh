@@ -24,7 +24,8 @@ annotate=     add a prefix to commit message of new commits
 b,branch=     create a new branch from the split subtree
 ignore-joins  ignore prior --rejoin commits
 onto=         try connecting new tree to an existing one
-rejoin        merge the new branch back into HEAD
+ options for 'merge' and 'split'
+rejoin        merge the branch into HEAD and make future splits start at this point
  options for 'add', 'merge', 'pull' and 'push'
 squash        merge subtree changes as a single commit
 "
@@ -337,6 +338,25 @@ rejoin_msg()
 	EOF
 }
 
+merge_rejoin_msg()
+{
+	dir="$1"
+	latest_old="$2"
+	latest_new="$3"
+	if [ -n "$message" ]; then
+		commit_message="$message"
+	else
+		commit_message="Rejoining '$dir/' at '$latest_new'"
+	fi
+	cat <<-EOF
+		$commit_message
+		
+		git-subtree-dir: $dir
+		git-subtree-mainline: $latest_old
+		git-subtree-split: $latest_new
+	EOF
+}
+
 squash_msg()
 {
 	dir="$1"
@@ -638,6 +658,11 @@ cmd_merge()
 		new=$(new_squash_commit "$old" "$sub" "$rev") || exit $?
 		debug "New squash commit: $new"
 		rev="$new"
+	fi
+
+	if [ -n "$rejoin" ]; then
+		headrev=$(git rev-parse HEAD) || exit $?
+		message=$(merge_rejoin_msg $prefix $headrev $rev)
 	fi
 
 	version=$(git version)
